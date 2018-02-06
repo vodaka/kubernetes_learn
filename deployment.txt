@@ -1,0 +1,68 @@
+kubernetes cluster
+
+Installing Kubernetes and Creating Kubernetes Cluster
+
+Kubernetes Master
+    centos 7.3
+    192.168.1.100/24
+
+Kubernetes Node 1
+    centos 7.3
+    192.168.1.101/24
+    
+Kubernetes Node 2
+    centos 7.3
+    192.168.1.102/24
+    
+=============================================================
+setup preparation:
+On Kubernetes master and nodes -- perform the following prework.
+
+1 Update the master and nodes to latest packages
+# yum update -y
+
+2 Disable the firewall
+# systemctl stop firewalld
+# systemctl disable firewalld
+
+3 Disable SElinux
+# cat /etc/sysconfig/selinux
+SELINUX=disabled
+
+4 Remove the chrony and install ntp
+# yum remove chrony -y
+# yum install ntp -y
+# systemctl start ntpd.service
+# systemctl enable ntpd.service
+
+5 update the /etc/hosts on master and nodes in the absence of DNS server
+192.168.1.100 kube-master
+192.168.1.101 kube-node-1
+192.168.1.101 kube-node-2
+
+6 Validate the Kubernetes Master and Node are able to ping each other using the ip addresses
+# ping 192.168.1.[100-102]
+
+=====================================================================================================
+Installation and Configuration Steps:
+
+1 Create repo file on all hosts(Master and nodes)
+# cat /etc/yum.repos.d/virt7-docker-common-release.repo
+name=virt7-docker-common-release
+baseurl=http://cbs.centos.org/repos/virt7-docker-common-release/x86_64/os
+gpgcheck=0
+
+2 Install Kubernetes, etcd and flannel on all hosts(Master and Nodes)
+# yum -y install --enablerepo=virt7-docker-common-release kubernetes etcd flannel
+
+3 Add below configuration in /etc/kubernetes/config (Master and Nodes)
+    KUBE_LOGTOSTDERR="--logtostderr=true"
+    KUBE_LOG_LEVEL="--v=0"
+    KUBE_ALLOW_PRIV="--allow-privileged=flase"
+    KUBE_MASTER="--master=http://kube-master:8080"
+    
+4 Configure the Kubernetes services on the master
+    add following lines in /etc/etcd/etcd.conf
+    ETCE_NAME=default
+    ETCD_DATA_DIR="var/lib/etcd/default.etcd"
+    
