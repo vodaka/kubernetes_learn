@@ -63,6 +63,68 @@ gpgcheck=0
     
 4 Configure the Kubernetes services on the master
     add following lines in /etc/etcd/etcd.conf
+    
     ETCE_NAME=default
     ETCD_DATA_DIR="var/lib/etcd/default.etcd"
-    
+    ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"
+    ETCD_ADVERTISE_CLIENT_URLS="http://0.0.0.0:2379"
+
+    add following lines in /etc/kubernetes/apiserver
+
+    KUBE_API_ADDRESS="--address=0.0.0.0"
+    KUBE_API_PORT="--port=8080"
+    KUBELET_PORT="--kubelet-poprt=10250"
+    KUBE_ETCD_SERVERS="--etcd-servers=http://kube-master:2379"
+    KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
+    KUBE_API_ARGS=""
+
+5 Start ETCD and configure it to hold the network overlay configuration 
+  on master:
+  Warning: This network must be unused in your network infrastructure !
+  172.30.0.0/16 if free in our network.
+
+  # systemctl start etcd
+  # etcdctl mkdir /kube-centos/network
+  # etcdctl mk /kube-centos/network/config "{ \"Network\": \"172.30.0.0/
+  16\", \"Subnetlen\":24, \"Backend\": {\"Type\": \"vxlan\"}}"
+
+6 Configure flannel to overlay Docker network in
+    /etc/sysconfig/flanneld hosts(Master and nodes)
+
+  FLANNEL_ETCD_ENDPOINTS="http://kube-master:2379"
+  FLANNEL_ETCD_PREFIX="/kube-centos/network"
+  FLANNEL_OPTIONS="--iface=eth1"
+
+7 Configre the kubernetes services on the nodes
+  Add following lines in /etc/kubernetes/kubelet
+
+  KUBELET_ADDRESS="--address=0.0.0.0"
+  KUBELET_PORT="--port=10250"
+  KUBELET_HOSTNAME="--hostname-override=kube-node-n" #replace n with nodenum
+  KUBELET_API_SERVER="--api-servers=http://kube-master:8080"
+  KUBELET_ARGS=""
+
+8 Start the appropriate services on master
+  # for SERVICES in etcd kube-apiserver kube-controller-manager kube-scheduler
+  flanneld;do
+  systemctl restart $SERVICES
+  systemctl enable $SERVICES
+  systemctl status $SERVICES
+  done
+
+9 Start the appropriate services on nodes
+  # for SERVICES in kube-proxy kubelet flanneld docker;do
+  systemctl restart $SERVICES
+  systemctl enable $SERVICES
+  systemctl status $SERVICES
+  done
+
+10 Configre kubelet on the nodes
+ # kubectl config set-cluster default-cluster --server=http://kube-master:8080
+ # kubectl config set-context default-context --cluster=default-cluster
+ --user=default-admin
+ # kubectl config user-context default-context
+
+ 11 verify kube master and see the cluster nodes
+    # kubectl get nodes
+
